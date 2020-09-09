@@ -1,0 +1,110 @@
+---
+title: "Project 3 - Breast Cancer Analysis and Zillow Analysis"
+output: html_notebook
+---
+
+Part B
+
+Import data from UCI machine learning library
+```{r}
+uciwd ="https://archive.ics.uci.edu/ml/machine-learning-databases/"
+mldata = paste(uciwd,"breast-cancer-wisconsin/breast-cancer-wisconsin.data", sep="")
+bcancer = read.csv(mldata)   # Treat the first row as variable names
+bcancer
+bcancer = read.csv(mldata, header=F) # Treat the data begins from the first row
+
+colnames(bcancer)=c("ID","clump_thick","cell_size","cell_shape", "marginal","epithelial","nuclei",
+                    "chromatin","nucleoli","mitoses","class")
+```
+View and analyze data
+```{r}
+str(bcancer)
+summary(bcancer)
+table(bcancer$nuclei)
+```
+Manipulate the data
+```{r}
+bcancer$nuclei = as.numeric(gsub("\\?","NA",bcancer$nuclei))
+library(DMwR)
+bcancer = knnImputation(bcancer)
+bcancer$class=factor(bcancer$class)
+```
+Run logistic function and find variables with significance to predict
+```{r}
+bcancer_logit = glm(class~., data=bcancer, family="binomial")
+summary(bcancer_logit)
+```
+
+Part C
+
+Source data from original script. Remove variables with too many missing values. 
+```{r}
+source("D03c_zillow.R", echo = TRUE)
+
+good_features = filter(missing_values, missing_pct<0.25)
+good_features
+
+gfeature = as.vector(good_features[,1])
+
+```
+Subsetting needed variables from the big dataset.
+```{r}
+zdata.a = subset(cor_tmp, select=c('logerror', gfeature))
+zdata3 = subset(cor_tmp, select=c('abs_logerror', gfeature))
+```
+Removing geographical and other variables not needed.
+```{r}
+# abs_logerror
+zdata4 = subset(zdata3, select = -c(2,8,10,11,13,14,15,16,17,19,22,23,24,25,28))
+# logerror
+zdata.log = subset(zdata.a, select = -c(2,8,10,11,13,14,15,16,17,19,22,23,24,25,28))
+```
+Correlation plot 
+```{r}
+corrplot(cor(zdata4, use = "complete.obs"), type = "lower", method = 'number')
+```
+Removing highly correlated variables for loerror and abs_logerror dataset.
+```{r}
+# abs_logerror
+zdata4_1 = subset(zdata4, select = -c(num_bathroom_calc, num_bath, area_total_calc))
+# logerror
+zdata.log_1 = subset(zdata.log, select = -c(num_bathroom_calc, num_bath, area_total_calc))
+```
+Convert variables to numeric before running linear regression.
+```{r}
+# abs_logerror
+zdata4_1$area_live_finished = as.numeric(zdata4_1$area_live_finished)
+zdata4_1$region_county = as.numeric(zdata4_1$region_county)
+# logerror
+zdata.log_1$area_live_finished = as.numeric(zdata.log_1$area_live_finished)
+zdata.log_1$region_county = as.numeric(zdata.log_1$region_county)
+```
+Took one last look at the data frame structure before runnnig linear regression.
+```{r}
+# logerror
+str(zdata.log_1)
+# abs_logerror
+str(zdata4_1)
+```
+Linear regression and regression subsets for logerror.
+```{r}
+# logerror
+fit.logerror = lm(logerror~.,zdata.log_1)
+summary(fit.logerror)
+regfit.logerror = regsubsets(logerror~.,zdata.log_1)
+summary(regfit.logerror)
+```
+Linear regression and regression subsets for abs_logerror.
+```{r}
+# abs_logerror
+fit.abs_logerror = lm(abs_logerror~.,zdata4_1)
+summary(fit.abs_logerror)
+regfit.abs_logerror = regsubsets(abs_logerror~.,zdata4_1)
+summary(regfit.abs_logerror)
+```
+
+Explanation of results
+
+The absolute value logerror (abs_logerror) model has more predictor variables with a stronger correlation to the dependent variable. The num_room variable didn't have any significance in any of the models and I would suggest to remove it. 
+
+
